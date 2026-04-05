@@ -1340,51 +1340,65 @@
 
             if (!body) return metadata;
 
-            const lines = body.split('\n');
-            let inMetadata = false;
-            let descLines = [];
+            try {
+                const lines = body.split('\n');
+                let inMetadata = false;
+                let descLines = [];
 
-            for (let line of lines) {
-                if (line.includes('**Metadata:**')) {
-                    inMetadata = true;
-                    continue;
-                }
-
-                if (inMetadata && line.startsWith('-')) {
-                    if (line.includes('Status:')) {
-                        metadata.status = line.split('Status:')[1].trim();
-                    } else if (line.includes('Priority:')) {
-                        metadata.priority = line.split('Priority:')[1].trim();
-                    } else if (line.includes('Deadline:')) {
-                        const deadline = line.split('Deadline:')[1].trim();
-                        if (deadline !== 'None') metadata.deadline = deadline;
-                    } else if (line.includes('Assignees:')) {
-                        const assigneesStr = line.split('Assignees:')[1].trim();
-                        if (assigneesStr !== 'None' && assigneesStr !== '[]') {
-                            const parsed = JSON.parse(assigneesStr);
-                            metadata.assignees = Array.isArray(parsed) ? parsed : [];
-                        }
-                    } else if (line.includes('Tags:')) {
-                        const tagsStr = line.split('Tags:')[1].trim();
-                        if (tagsStr !== 'None') {
-                            metadata.tags = tagsStr.split(',').map(t => t.trim());
-                        }
-                    } else if (line.includes('Checklist:')) {
-                        const checklistStr = line.split('Checklist:')[1].trim();
-                        if (checklistStr !== '[]' && checklistStr !== 'None') {
-                            try {
-                                metadata.checklist = JSON.parse(checklistStr);
-                            } catch (e) {
-                                metadata.checklist = [];
-                            }
-                        }
+                for (let line of lines) {
+                    if (line.includes('**Metadata:**')) {
+                        inMetadata = true;
+                        continue;
                     }
-                } else if (!inMetadata && !line.includes('---')) {
-                    descLines.push(line);
+
+                    if (inMetadata && line.startsWith('-')) {
+                        try {
+                            if (line.includes('Status:')) {
+                                metadata.status = line.split('Status:')[1].trim();
+                            } else if (line.includes('Priority:')) {
+                                metadata.priority = line.split('Priority:')[1].trim();
+                            } else if (line.includes('Deadline:')) {
+                                const deadline = line.split('Deadline:')[1].trim();
+                                if (deadline !== 'None') metadata.deadline = deadline;
+                            } else if (line.includes('Assignees:')) {
+                                const assigneesStr = line.split('Assignees:')[1].trim();
+                                if (assigneesStr !== 'None' && assigneesStr !== '[]') {
+                                    try {
+                                        const parsed = JSON.parse(assigneesStr);
+                                        metadata.assignees = Array.isArray(parsed) ? parsed : [];
+                                    } catch (e) {
+                                        metadata.assignees = [];
+                                    }
+                                }
+                            } else if (line.includes('Tags:')) {
+                                const tagsStr = line.split('Tags:')[1].trim();
+                                if (tagsStr !== 'None') {
+                                    metadata.tags = tagsStr.split(',').map(t => t.trim()).filter(t => t);
+                                }
+                            } else if (line.includes('Checklist:')) {
+                                const checklistStr = line.split('Checklist:')[1].trim();
+                                if (checklistStr !== '[]' && checklistStr !== 'None') {
+                                    try {
+                                        const parsed = JSON.parse(checklistStr);
+                                        metadata.checklist = Array.isArray(parsed) ? parsed : [];
+                                    } catch (e) {
+                                        metadata.checklist = [];
+                                    }
+                                }
+                            }
+                        } catch (lineError) {
+                            console.warn('Error parsing metadata line:', line, lineError);
+                        }
+                    } else if (!inMetadata && !line.includes('---')) {
+                        descLines.push(line);
+                    }
                 }
+
+                metadata.description = descLines.join('\n').trim();
+            } catch (error) {
+                console.error('Error parsing project metadata:', error);
             }
 
-            metadata.description = descLines.join('\n').trim();
             return metadata;
         }
 
