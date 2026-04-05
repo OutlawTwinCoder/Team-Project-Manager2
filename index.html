@@ -1194,8 +1194,20 @@
             const metadata = parseProjectMetadata(currentProject.body);
             if (metadata.checklist && metadata.checklist[index]) {
                 metadata.checklist[index].done = !metadata.checklist[index].done;
-                await updateProject(metadata);
-                await openDetailsModal(currentProject.number);
+                
+                try {
+                    await updateProject(metadata);
+                    // Refresh projects list without closing modal
+                    await loadProjects();
+                    // Re-render the modal with updated data
+                    const updatedProject = projects.find(p => p.number === currentProject.number);
+                    if (updatedProject) {
+                        currentProject = updatedProject;
+                        await openDetailsModal(currentProject.number);
+                    }
+                } catch (error) {
+                    showMessage('Error updating task', 'error');
+                }
             }
         }
 
@@ -1280,11 +1292,18 @@
                     }
                 );
 
-                if (!response.ok) throw new Error('Failed to update project');
+                if (!response.ok) {
+                    throw new Error(`GitHub API error: ${response.status}`);
+                }
 
-                await loadProjects();
+                // Update current project with new body
+                currentProject.body = body;
+                showMessage('Task updated', 'success');
+                return true;
             } catch (error) {
-                showMessage('Error: ' + error.message, 'error');
+                console.error('Update error:', error);
+                showMessage('Error updating: ' + error.message, 'error');
+                return false;
             }
         }
 
